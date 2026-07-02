@@ -1,0 +1,25 @@
+{
+  "name": "Leave Application Calendar",
+  "short_name": "Leave Calendar",
+  "description": "Staff roster, shift codes, leave applications, and locks.",
+  "start_url": "/leave-application-calendar.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#f5f7f8",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "/pwa-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
