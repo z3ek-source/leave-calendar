@@ -7,10 +7,26 @@ from urllib.parse import urlparse
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.environ.get("DATA_DIR", BASE_DIR)
+REQUESTED_DATA_DIR = os.environ.get("DATA_DIR", BASE_DIR)
+FALLBACK_DATA_DIR = os.path.join("/tmp", "leave-calendar")
+DATA_DIR = REQUESTED_DATA_DIR
 DATA_FILE = os.path.join(DATA_DIR, "leave-calendar-data.json")
 COUNTED_LEAVE_CODES = {"VL", "C", "U", "EPH", "ICT", "PL", "ML"}
 LOCK = threading.Lock()
+
+
+def ensure_data_dir():
+    global DATA_DIR, DATA_FILE
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        test_file = os.path.join(DATA_DIR, ".write-test")
+        with open(test_file, "w", encoding="utf-8") as handle:
+            handle.write("ok")
+        os.remove(test_file)
+    except OSError:
+        DATA_DIR = FALLBACK_DATA_DIR
+        DATA_FILE = os.path.join(DATA_DIR, "leave-calendar-data.json")
+        os.makedirs(DATA_DIR, exist_ok=True)
 
 
 def default_state():
@@ -39,6 +55,7 @@ def initial_payload():
 
 
 def read_payload():
+    ensure_data_dir()
     if not os.path.exists(DATA_FILE):
         payload = initial_payload()
         write_payload(payload)
@@ -48,7 +65,7 @@ def read_payload():
 
 
 def write_payload(payload):
-    os.makedirs(DATA_DIR, exist_ok=True)
+    ensure_data_dir()
     temp_file = f"{DATA_FILE}.tmp"
     with open(temp_file, "w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2)
