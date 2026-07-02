@@ -1,4 +1,4 @@
-const CACHE_NAME = "leave-calendar-pwa-v1";
+const CACHE_NAME = "leave-calendar-pwa-v2";
 const APP_SHELL = [
   "/",
   "/leave-application-calendar.html",

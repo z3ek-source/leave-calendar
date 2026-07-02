@@ -145,6 +145,10 @@
       white-space: nowrap;
     }
 
+    .toolbar-toggle {
+      display: none;
+    }
+
     .btn:hover { background: #dfe8eb; }
 
     .btn-primary {
@@ -344,6 +348,13 @@
       overflow-wrap: anywhere;
       line-height: 1.2;
       font-size: 14px;
+    }
+
+    .staff-name.editable {
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 3px;
     }
 
     .staff-meta {
@@ -570,6 +581,17 @@
       flex-wrap: wrap;
     }
 
+    .modal-actions.split {
+      justify-content: space-between;
+    }
+
+    .modal-actions .right-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
     .roster-days {
       display: grid;
       grid-template-columns: repeat(var(--pattern-days), minmax(28px, 1fr));
@@ -655,7 +677,39 @@
     }
 
     @media (max-width: 760px) {
-      .topbar { padding: 12px; }
+      .topbar { padding: 10px; gap: 8px; }
+      .brand { min-width: 0; gap: 8px; }
+      .brand-mark { width: 34px; height: 34px; }
+      h1 { font-size: 18px; }
+      .btn {
+        min-height: 32px;
+        padding: 0 9px;
+        font-size: 13px;
+        gap: 5px;
+      }
+      .select {
+        min-height: 34px;
+        padding: 6px 8px;
+        font-size: 13px;
+      }
+      .mode-pill, .user-pill, .notice {
+        min-height: 26px;
+        font-size: 11px;
+      }
+      .toolbar-toggle {
+        display: inline-flex;
+      }
+      .topbar.actions-collapsed .toolbar-extra {
+        display: none;
+      }
+      .legend {
+        gap: 5px;
+        font-size: 11px;
+      }
+      .legend-item {
+        min-height: 22px;
+        padding: 0 6px;
+      }
       .calendar-wrap { padding: 12px; }
       .form-grid { grid-template-columns: 1fr; }
       .roster-days { grid-template-columns: repeat(7, minmax(0, 1fr)); }
@@ -679,9 +733,10 @@
           <span class="user-pill" id="userPill">Not logged in</span>
           <span class="notice" id="externalChangeNotice" hidden>User had made leave changes</span>
           <span class="notice locked" id="monthLockNotice" hidden>All Leave Application for the Month is Locked</span>
+          <button class="btn toolbar-toggle" id="toolbarToggle" type="button">Hide Buttons</button>
         </div>
       </div>
-      <div class="bar-row">
+      <div class="bar-row toolbar-extra">
         <div class="controls">
           <button class="btn btn-primary" id="loginBtn">User Login</button>
           <button class="btn" id="logoutBtn" hidden>Logout</button>
@@ -699,7 +754,7 @@
           <button class="btn btn-danger" id="exitAdminBtn">Exit Admin</button>
         </div>
       </div>
-      <div class="legend">
+      <div class="legend toolbar-extra">
         <span class="legend-item">Shift:</span>
         <span class="legend-item"><span class="shift D">D</span> Day</span>
         <span class="legend-item"><span class="shift G">G</span> Night</span>
@@ -940,8 +995,8 @@
     <form class="modal" method="dialog" id="staffForm">
       <div class="modal-head">
         <div>
-          <h2>Add Staff</h2>
-          <div class="subtle">Add staff login details and roster attributes.</div>
+          <h2 id="staffDialogTitle">Add Staff</h2>
+          <div class="subtle" id="staffDialogSubtitle">Add staff login details and roster attributes.</div>
         </div>
         <button class="close" value="cancel" type="button" data-close>&times;</button>
       </div>
@@ -976,9 +1031,28 @@
           <input id="staffPassword" type="password" autocomplete="new-password" required>
         </div>
       </div>
+      <div class="modal-actions split">
+        <button class="btn btn-danger" type="button" id="deleteStaffBtn" hidden>Delete Staff</button>
+        <div class="right-actions">
+          <button class="btn" type="button" data-close>Cancel</button>
+          <button class="btn btn-primary" type="submit" id="staffSubmitBtn">Add Staff</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="staffPromptDialog">
+    <form class="modal" method="dialog">
+      <div class="modal-head">
+        <div>
+          <h2>Edit Staff?</h2>
+          <div class="subtle" id="staffPromptName"></div>
+        </div>
+        <button class="close" value="cancel" type="button" data-close>&times;</button>
+      </div>
       <div class="modal-actions">
-        <button class="btn" type="button" data-close>Cancel</button>
-        <button class="btn btn-primary" type="submit">Add Staff</button>
+        <button class="btn" type="button" data-close>No</button>
+        <button class="btn btn-primary" type="button" id="confirmEditStaffBtn">Yes</button>
       </div>
     </form>
   </dialog>
@@ -1040,8 +1114,11 @@
     let adminMode = false;
     let pendingChanges = {};
     let activeCell = null;
+    let activeStaffId = null;
+    let staffFormMode = "add";
     let selectedPatternDate = null;
     let dragStaffId = null;
+    let toolbarCollapsed = window.matchMedia("(max-width: 760px)").matches;
     let serverVersion = 0;
     let lastServerUpdatedBy = "";
     const clientId = localStorage.getItem(`${storeKey}-client-id`) || crypto.randomUUID();
@@ -1060,6 +1137,7 @@
       confirmBtn: document.getElementById("confirmBtn"),
       changePasswordBtn: document.getElementById("changePasswordBtn"),
       adminModeBtn: document.getElementById("adminModeBtn"),
+      toolbarToggle: document.getElementById("toolbarToggle"),
       adminActions: document.getElementById("adminActions"),
       exitAdminBtn: document.getElementById("exitAdminBtn"),
       leaveLimitLabel: document.getElementById("leaveLimitLabel"),
@@ -1097,15 +1175,23 @@
       patternScope: document.getElementById("patternScope"),
       rosterDays: document.getElementById("rosterDays"),
       staffDialog: document.getElementById("staffDialog"),
-      staffForm: document.getElementById("staffForm")
+      staffForm: document.getElementById("staffForm"),
+      staffDialogTitle: document.getElementById("staffDialogTitle"),
+      staffDialogSubtitle: document.getElementById("staffDialogSubtitle"),
+      staffSubmitBtn: document.getElementById("staffSubmitBtn"),
+      deleteStaffBtn: document.getElementById("deleteStaffBtn"),
+      staffPromptDialog: document.getElementById("staffPromptDialog"),
+      staffPromptName: document.getElementById("staffPromptName"),
+      confirmEditStaffBtn: document.getElementById("confirmEditStaffBtn")
     };
 
     initialise();
 
     async function initialise() {
       monthNames.forEach((name, index) => els.monthSelect.add(new Option(name, index)));
-      const startYear = Math.min(2026, today.getFullYear());
-      for (let year = startYear; year <= startYear + 5; year += 1) {
+      const startYear = today.getFullYear();
+      if (visibleYear < startYear || visibleYear > startYear + 1) visibleYear = startYear;
+      for (let year = startYear; year <= startYear + 1; year += 1) {
         els.yearSelect.add(new Option(year, year));
       }
       els.monthSelect.value = visibleMonth;
@@ -1151,6 +1237,10 @@
       });
       els.confirmBtn.addEventListener("click", confirmSubmission);
       els.changePasswordBtn.addEventListener("click", openPasswordDialog);
+      els.toolbarToggle.addEventListener("click", () => {
+        toolbarCollapsed = !toolbarCollapsed;
+        renderTopbar();
+      });
       document.getElementById("lockDayBtn").addEventListener("click", () => {
         els.lockDayDate.value = dateKey(visibleYear, visibleMonth, 1);
         els.lockDayDialog.showModal();
@@ -1165,8 +1255,7 @@
       });
       document.getElementById("patternBtn").addEventListener("click", openPatternDialog);
       document.getElementById("addStaffBtn").addEventListener("click", () => {
-        els.staffForm.reset();
-        els.staffDialog.showModal();
+        openAddStaffDialog();
       });
       document.getElementById("exportBtn").addEventListener("click", exportExcel);
 
@@ -1188,7 +1277,14 @@
       els.limitForm.addEventListener("submit", updateLimit);
       els.patternStaff.addEventListener("change", renderRosterDays);
       els.patternForm.addEventListener("submit", generatePattern);
-      els.staffForm.addEventListener("submit", addStaff);
+      els.staffForm.addEventListener("submit", saveStaff);
+      els.staffForm.addEventListener("input", validateStaffForm);
+      els.staffForm.addEventListener("change", validateStaffForm);
+      els.deleteStaffBtn.addEventListener("click", deleteStaff);
+      els.confirmEditStaffBtn.addEventListener("click", () => {
+        els.staffPromptDialog.close();
+        openEditStaffDialog(activeStaffId);
+      });
 
       document.querySelectorAll("[data-close]").forEach((button) => {
         button.addEventListener("click", () => button.closest("dialog").close());
@@ -1248,7 +1344,7 @@
     async function loadSharedState(options = {}) {
       if (!canUseSharedServer()) return false;
       try {
-        const response = await fetch("/api/state");
+        const response = await fetch("/api/state", { cache: "no-store" });
         if (!response.ok) throw new Error("Shared state unavailable");
         const payload = await response.json();
         if (payload.state) {
@@ -1284,6 +1380,8 @@
 
     function renderTopbar() {
       const user = getCurrentUser();
+      document.querySelector(".topbar").classList.toggle("actions-collapsed", toolbarCollapsed);
+      els.toolbarToggle.textContent = toolbarCollapsed ? "Show Buttons" : "Hide Buttons";
       els.modePill.textContent = adminMode ? "Admin mode" : "Normal user mode";
       els.modePill.classList.toggle("admin", adminMode);
       els.userPill.textContent = user ? `Logged in: ${user.name}` : "Not logged in";
@@ -1347,8 +1445,12 @@
       }
       const main = document.createElement("div");
       main.className = "staff-main";
+      if (adminMode) {
+        main.title = "Edit staff";
+        main.addEventListener("click", () => openStaffPrompt(staff.id));
+      }
       main.innerHTML = `
-        <div class="staff-name">${escapeHtml(staff.name)}</div>
+        <div class="staff-name ${adminMode ? "editable" : ""}">${escapeHtml(staff.name)}</div>
         <div class="staff-meta">
           <span class="tag">${escapeHtml(staff.group)}</span>
           <span class="tag">${escapeHtml(staff.role)}</span>
@@ -1727,28 +1829,112 @@
       showToast("Roster pattern generated.");
     }
 
-    function addStaff(event) {
-      event.preventDefault();
-      const username = document.getElementById("staffUsername").value.trim();
-      if (state.staff.some((staff) => staff.username === username)) {
-        showToast("Username already exists.");
-        return;
-      }
-      const staff = {
-        id: crypto.randomUUID(),
+    function openStaffPrompt(staffId) {
+      activeStaffId = staffId;
+      const staff = state.staff.find((item) => item.id === staffId);
+      if (!staff) return;
+      els.staffPromptName.textContent = staff.name;
+      els.staffPromptDialog.showModal();
+    }
+
+    function openAddStaffDialog() {
+      staffFormMode = "add";
+      activeStaffId = null;
+      els.staffForm.reset();
+      els.staffDialogTitle.textContent = "Add Staff";
+      els.staffDialogSubtitle.textContent = "Add staff login details and roster attributes.";
+      els.staffSubmitBtn.textContent = "Add Staff";
+      els.staffSubmitBtn.disabled = false;
+      els.deleteStaffBtn.hidden = true;
+      els.staffDialog.showModal();
+    }
+
+    function openEditStaffDialog(staffId) {
+      const staff = state.staff.find((item) => item.id === staffId);
+      if (!staff) return;
+      staffFormMode = "edit";
+      activeStaffId = staffId;
+      els.staffDialogTitle.textContent = "Edit Staff";
+      els.staffDialogSubtitle.textContent = "Update staff details, login, role, group, and OJT status.";
+      document.getElementById("staffName").value = staff.name;
+      document.getElementById("staffGroup").value = staff.group;
+      document.getElementById("staffRole").value = staff.role;
+      document.getElementById("staffOjt").checked = staff.ojt;
+      document.getElementById("staffUsername").value = staff.username;
+      document.getElementById("staffPassword").value = staff.password;
+      els.staffSubmitBtn.textContent = "Update";
+      els.staffSubmitBtn.disabled = true;
+      els.deleteStaffBtn.hidden = false;
+      els.staffDialog.showModal();
+    }
+
+    function staffFormValues() {
+      return {
         name: document.getElementById("staffName").value.trim(),
         group: document.getElementById("staffGroup").value,
         role: document.getElementById("staffRole").value,
         ojt: document.getElementById("staffOjt").checked,
-        username,
-        password: document.getElementById("staffPassword").value,
-        order: state.staff.length + 1
+        username: document.getElementById("staffUsername").value.trim(),
+        password: document.getElementById("staffPassword").value
       };
-      state.staff.push(staff);
-      persist();
+    }
+
+    function validateStaffForm() {
+      if (staffFormMode !== "edit") return;
+      const staff = state.staff.find((item) => item.id === activeStaffId);
+      if (!staff) return;
+      const values = staffFormValues();
+      const changed = values.name !== staff.name ||
+        values.group !== staff.group ||
+        values.role !== staff.role ||
+        values.ojt !== staff.ojt ||
+        values.username !== staff.username ||
+        values.password !== staff.password;
+      els.staffSubmitBtn.disabled = !changed || !values.name || !values.username || !values.password;
+    }
+
+    async function saveStaff(event) {
+      event.preventDefault();
+      const values = staffFormValues();
+      if (state.staff.some((staff) => staff.username === values.username && staff.id !== activeStaffId)) {
+        showToast("Username already exists.");
+        return;
+      }
+      if (staffFormMode === "edit") {
+        const staff = state.staff.find((item) => item.id === activeStaffId);
+        if (!staff) return;
+        Object.assign(staff, values);
+      } else {
+        state.staff.push({
+          id: crypto.randomUUID(),
+          ...values,
+          order: state.staff.length + 1
+        });
+      }
+      await persist({ message: staffFormMode === "edit" ? "Staff updated" : "Staff added" });
       els.staffDialog.close();
       render();
-      showToast("Staff added.");
+      showToast(staffFormMode === "edit" ? "Staff updated." : "Staff added.");
+    }
+
+    async function deleteStaff() {
+      const staff = state.staff.find((item) => item.id === activeStaffId);
+      if (!staff) return;
+      if (!confirm(`Delete ${staff.name} from the calendar?`)) return;
+      state.staff = state.staff.filter((item) => item.id !== activeStaffId);
+      Object.keys(state.cells).forEach((key) => {
+        if (key.startsWith(`${activeStaffId}|`)) delete state.cells[key];
+      });
+      Object.keys(pendingChanges).forEach((key) => {
+        if (key.startsWith(`${activeStaffId}|`)) delete pendingChanges[key];
+      });
+      state.staff.forEach((item, index) => { item.order = index + 1; });
+      if (currentUserId === activeStaffId) currentUserId = null;
+      await persist({ message: "Staff deleted" });
+      els.staffDialog.close();
+      activeStaffId = null;
+      render();
+      showToast("Staff deleted.");
     }
 
     function reorderStaff(fromId, toId) {
@@ -1878,7 +2064,7 @@
 
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+        navigator.serviceWorker.register("/service-worker.js").then((registration) => registration.update()).catch(() => {});
       });
     }
   </script>
