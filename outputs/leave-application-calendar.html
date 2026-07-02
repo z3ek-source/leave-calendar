@@ -1,0 +1,1886 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Staff Leave Roster Calendar</title>
+  <meta name="theme-color" content="#0f766e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Leave Calendar">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/pwa-icon-180.png">
+  <link rel="icon" sizes="192x192" href="/pwa-icon-192.png">
+  <style>
+    :root {
+      --ink: #172026;
+      --muted: #65727e;
+      --line: #d9e2e7;
+      --soft-line: #edf2f4;
+      --bg: #f5f7f8;
+      --panel: #ffffff;
+      --accent: #0f766e;
+      --accent-dark: #0b5f59;
+      --accent-soft: #d9f4ef;
+      --amber: #a15c00;
+      --amber-soft: #fff1cc;
+      --red: #b42318;
+      --red-soft: #ffe4df;
+      --blue: #2563eb;
+      --blue-soft: #e7efff;
+      --green-soft: #e8f7df;
+      --shadow: 0 14px 35px rgba(23, 32, 38, 0.11);
+      --staff-column: 260px;
+      --day-column: 54px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    button, input, select {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: #fbfcfc;
+      border-bottom: 1px solid var(--line);
+      padding: 14px 18px;
+      display: grid;
+      gap: 12px;
+      box-shadow: 0 2px 12px rgba(23, 32, 38, 0.04);
+    }
+
+    .bar-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 230px;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 900;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 21px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .subtle {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.3;
+    }
+
+    .controls, .admin-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .select, .input {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      background: #fff;
+      color: var(--ink);
+      min-width: 0;
+    }
+
+    .btn {
+      min-height: 38px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 12px;
+      font-weight: 800;
+      color: var(--ink);
+      background: #eaf0f2;
+      white-space: nowrap;
+    }
+
+    .btn:hover { background: #dfe8eb; }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover { background: var(--accent-dark); }
+
+    .btn-danger {
+      background: var(--red-soft);
+      color: var(--red);
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .mode-pill, .user-pill, .notice {
+      min-height: 30px;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 800;
+      background: #eef3f5;
+      color: var(--muted);
+    }
+
+    .mode-pill.admin {
+      background: var(--blue-soft);
+      color: var(--blue);
+    }
+
+    .notice.locked {
+      margin-left: auto;
+      background: var(--red-soft);
+      color: var(--red);
+    }
+
+    .legend {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid var(--line);
+      font-weight: 700;
+    }
+
+    .calendar-wrap {
+      min-width: 0;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: auto;
+      padding: 12px;
+      scrollbar-gutter: stable;
+    }
+
+    .calendar {
+      display: grid;
+      grid-template-columns: var(--staff-column) repeat(var(--days), var(--day-column));
+      width: calc(var(--staff-column) + (var(--days) * var(--day-column)));
+      min-width: calc(var(--staff-column) + (var(--days) * var(--day-column)));
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: visible;
+    }
+
+    .corner, .day-head, .staff, .cell {
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .corner, .day-head {
+      position: sticky;
+      top: 0;
+      z-index: 8;
+      background: #fbfcfc;
+    }
+
+    .corner {
+      left: 0;
+      z-index: 12;
+      min-height: 66px;
+      display: grid;
+      align-content: center;
+      padding: 8px 10px;
+      font-weight: 900;
+    }
+
+    .day-head {
+      min-height: 66px;
+      padding: 6px 3px;
+      text-align: center;
+      display: grid;
+      align-content: center;
+      gap: 3px;
+    }
+
+    .day-num {
+      font-size: 15px;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .day-name, .holiday-name {
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.2;
+      overflow-wrap: anywhere;
+    }
+
+    .holiday-name {
+      color: var(--red);
+      font-weight: 800;
+    }
+
+    .day-lock {
+      justify-self: center;
+      min-height: 17px;
+      border-radius: 999px;
+      padding: 0 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--red-soft);
+      color: var(--red);
+      font-size: 9px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .day-head.holiday {
+      background: #fff5f4;
+    }
+
+    .day-head.weekend {
+      background: #f4f8fa;
+    }
+
+    .staff {
+      position: sticky;
+      left: 0;
+      z-index: 6;
+      min-height: 62px;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 9px;
+      align-items: center;
+      padding: 7px 8px;
+      background: #fff;
+      box-shadow: 4px 0 0 rgba(255, 255, 255, 0.92);
+    }
+
+    .drag-handle {
+      width: 24px;
+      height: 38px;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      background: #eef3f5;
+      color: var(--muted);
+      font-weight: 900;
+      cursor: grab;
+      user-select: none;
+    }
+
+    .drag-handle.disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+
+    .staff-main {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .staff-name {
+      font-weight: 900;
+      overflow-wrap: anywhere;
+      line-height: 1.2;
+      font-size: 14px;
+    }
+
+    .staff-meta {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .tag {
+      min-height: 20px;
+      padding: 0 6px;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      background: #eef3f5;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .tag.ojt {
+      background: var(--green-soft);
+      color: #4d7c0f;
+    }
+
+    .cell {
+      min-height: 62px;
+      padding: 4px 2px;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 4px;
+      background: #fff;
+      position: relative;
+    }
+
+    .cell.weekend { background: #fafcfd; }
+    .cell.holiday { background: #fffafa; }
+    .cell.locked { background: #f6f7f8; }
+    .cell.editable:hover { outline: 2px solid rgba(15, 118, 110, 0.32); outline-offset: -2px; }
+    .cell.dirty::after {
+      content: "";
+      position: absolute;
+      right: 6px;
+      top: 6px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--amber);
+    }
+
+    .shift {
+      min-width: 24px;
+      height: 22px;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 900;
+      background: #eef3f5;
+    }
+
+    .shift.D { background: #e4f2ff; color: #075985; }
+    .shift.G { background: #eee9ff; color: #5b21b6; }
+    .shift.O { background: #f0fdf4; color: #166534; }
+    .shift.S { background: #fff7ed; color: #9a3412; }
+    .shift.N { background: #f3f4f6; color: #374151; }
+
+    .leave {
+      min-height: 22px;
+      min-width: 24px;
+      padding: 0 3px;
+      border-radius: 5px;
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      font-weight: 900;
+      background: var(--accent-soft);
+      color: var(--accent-dark);
+    }
+
+    .leave.empty {
+      background: transparent;
+      color: #b3bec6;
+      font-weight: 700;
+    }
+
+    .lock-text {
+      color: var(--red);
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    dialog {
+      width: min(560px, calc(100vw - 28px));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 0;
+    }
+
+    #patternDialog {
+      width: min(1180px, calc(100vw - 24px));
+    }
+
+    dialog::backdrop {
+      background: rgba(23, 32, 38, 0.34);
+    }
+
+    .modal {
+      display: grid;
+      gap: 16px;
+      padding: 18px;
+    }
+
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .modal h2 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+
+    .close {
+      width: 34px;
+      height: 34px;
+      border-radius: 6px;
+      background: #eef3f5;
+      color: var(--ink);
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field {
+      min-width: 0;
+      display: grid;
+      gap: 6px;
+    }
+
+    .field.full { grid-column: 1 / -1; }
+
+    label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .field input, .field select {
+      width: 100%;
+      min-width: 0;
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .leave-picker {
+      display: grid;
+      gap: 10px;
+    }
+
+    .leave-tiles {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .leave-tile {
+      min-height: 48px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      display: grid;
+      place-items: center;
+      padding: 6px;
+      font-weight: 900;
+    }
+
+    .leave-tile:hover {
+      border-color: var(--accent);
+      background: #f2fbf8;
+    }
+
+    .leave-tile.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent-dark);
+      box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.14);
+    }
+
+    .leave-special {
+      display: grid;
+      gap: 6px;
+    }
+
+    .checkline {
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+      color: var(--muted);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .roster-days {
+      display: grid;
+      grid-template-columns: repeat(var(--pattern-days), minmax(28px, 1fr));
+      gap: 4px;
+      overflow: visible;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfc;
+    }
+
+    .roster-day {
+      min-height: 118px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      padding: 5px 3px;
+      display: grid;
+      gap: 4px;
+      align-content: start;
+    }
+
+    .roster-day strong {
+      text-align: center;
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .shift-options {
+      display: grid;
+      gap: 3px;
+    }
+
+    .shift-option {
+      width: 100%;
+      min-height: 18px;
+      border-radius: 4px;
+      display: grid;
+      place-items: center;
+      background: #eef3f5;
+      color: var(--ink);
+      font-size: 11px;
+      font-weight: 900;
+      padding: 0;
+    }
+
+    .shift-option.D { background: #e4f2ff; color: #075985; }
+    .shift-option.G { background: #eee9ff; color: #5b21b6; }
+    .shift-option.O { background: #f0fdf4; color: #166534; }
+    .shift-option.S { background: #fff7ed; color: #9a3412; }
+    .shift-option.N { background: #f3f4f6; color: #374151; }
+
+    .shift-option.active {
+      outline: 2px solid var(--ink);
+      outline-offset: -2px;
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      max-width: min(380px, calc(100vw - 36px));
+      z-index: 50;
+      background: var(--ink);
+      color: #fff;
+      border-radius: 8px;
+      padding: 13px 15px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: 160ms ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .legend-item .shift {
+      display: inline-grid;
+      margin-right: 4px;
+    }
+
+    @media (max-width: 760px) {
+      .topbar { padding: 12px; }
+      .calendar-wrap { padding: 12px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .roster-days { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="bar-row">
+        <div class="brand">
+          <div class="brand-mark">LC</div>
+          <div>
+            <h1>Leave Application Calendar</h1>
+          </div>
+        </div>
+        <div class="controls">
+          <select class="select" id="monthSelect" aria-label="Month"></select>
+          <select class="select" id="yearSelect" aria-label="Year"></select>
+          <span class="mode-pill" id="modePill">Normal user mode</span>
+          <span class="user-pill" id="userPill">Not logged in</span>
+          <span class="notice" id="externalChangeNotice" hidden>User had made leave changes</span>
+          <span class="notice locked" id="monthLockNotice" hidden>All Leave Application for the Month is Locked</span>
+        </div>
+      </div>
+      <div class="bar-row">
+        <div class="controls">
+          <button class="btn btn-primary" id="loginBtn">User Login</button>
+          <button class="btn" id="logoutBtn" hidden>Logout</button>
+          <button class="btn" id="confirmBtn" disabled>Confirm Submission</button>
+          <button class="btn" id="changePasswordBtn">Change Password</button>
+          <button class="btn" id="adminModeBtn">Admin Mode</button>
+        </div>
+        <div class="admin-actions" id="adminActions" hidden>
+          <button class="btn" id="lockDayBtn">Lock Day</button>
+          <button class="btn" id="lockMonthBtn">Lock Leave Application</button>
+          <button class="btn" id="limitLeaveBtn">Limit Leave</button>
+          <button class="btn" id="patternBtn">Generate Roster Pattern</button>
+          <button class="btn" id="addStaffBtn">Add Staff</button>
+          <button class="btn" id="exportBtn">Export to Excel</button>
+          <button class="btn btn-danger" id="exitAdminBtn">Exit Admin</button>
+        </div>
+      </div>
+      <div class="legend">
+        <span class="legend-item">Shift:</span>
+        <span class="legend-item"><span class="shift D">D</span> Day</span>
+        <span class="legend-item"><span class="shift G">G</span> Night</span>
+        <span class="legend-item"><span class="shift O">O</span> Off</span>
+        <span class="legend-item"><span class="shift S">S</span> Standby</span>
+        <span class="legend-item"><span class="shift N">N</span> Non-Shift</span>
+        <span class="legend-item">Leave limit: <span id="leaveLimitLabel"></span></span>
+      </div>
+    </header>
+
+    <main class="calendar-wrap">
+      <section class="calendar" id="calendar" aria-label="Staff leave roster calendar"></section>
+    </main>
+  </div>
+
+  <dialog id="loginDialog">
+    <form class="modal" method="dialog" id="loginForm">
+      <div class="modal-head">
+        <div>
+          <h2>User Login</h2>
+          <div class="subtle">Login to amend your own leave applications.</div>
+        </div>
+        <button class="close" value="cancel" type="button" data-close>&times;</button>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="loginUsername">Username</label>
+          <input id="loginUsername" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="loginPassword">Password</label>
+          <input id="loginPassword" type="password" autocomplete="current-password" required>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" data-close>Cancel</button>
+        <button class="btn btn-primary" type="submit">Submit</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="passwordDialog">
+    <form class="modal" method="dialog" id="passwordForm">
+      <div class="modal-head">
+        <div>
+          <h2>Change Password</h2>
+          <div class="subtle">New password and retype password must match.</div>
+        </div>
+        <button class="close" value="cancel" type="button" data-close>&times;</button>
+      </div>
+      <div class="form-grid">
+        <div class="field full">
+          <label for="oldPassword">Old password</label>
+          <input id="oldPassword" type="password" required>
+        </div>
+        <div class="field">
+          <label for="newPassword">New password</label>
+          <input id="newPassword" type="password" required>
+        </div>
+        <div class="field">
+          <label for="retypePassword">Retype new password</label>
+          <input id="retypePassword" type="password" required>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" data-close>Cancel</button>
+        <button class="btn btn-primary" type="submit" id="passwordSubmit" disabled>Update</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="adminLoginDialog">
+    <form class="modal" method="dialog" id="adminLoginForm">
+      <div class="modal-head">
+        <div>
+          <h2>Admin Mode</h2>
+          <div class="subtle"></div>
+        </div>
+        <button class="close" value="cancel" type="button" data-close>&times;</button>
+      </div>
+      <div class="field">
+        <label for="adminPassword">Admin password</label>
+        <input id="adminPassword" type="password" required>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" data-close>Cancel</button>
+        <button class="btn btn-primary" type="submit">Enter Admin Mode</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="cellDialog">
+    <form class="modal" method="dialog" id="cellForm">
+      <div class="modal-head">
+        <div>
+          <h2 id="cellTitle">Update Day</h2>
+          <div class="subtle" id="cellSubtitle"></div>
+        </div>
+        <button class="close" value="cancel" type="button" data-close>&times;</button>
+      </div>
+      <div class="form-grid">
+        <div class="field" id="shiftField">
+          <label for="cellShift">Shift code</label>
+          <select id="cellShift">
+            <option value="D">Day (D)</option>
+            <option value="G">Night (G)</option>
+            <option value="O">Off (O)</option>
+            <option value="S">Standby (S)</option>
+            <option value="N">Non-Shift (N)</option>
+          </select>
+        </div>
+        <div class="field full">
+          <label>Leave code</label>
+          <input id="cellLeave" type="hidden">
+          <div class="leave-picker">
+            <div class="leave-tiles" id="leaveTiles">
+              <button class="leave-tile" type="button" data-leave="">No Leave</button>
+              <button class="leave-tile" type="button" data-leave="VL">VL</button>
+              <button class="leave-tile" type="button" data-leave="U">U</button>
+              <button class="leave-tile" type="button" data-leave="EPH">EPH</button>
+            </div>
+            <div class="leave-special">
+              <label for="specialLeave">Special leave</label>
+              <select id="specialLeave">
+                <option value="">Select special leave</option>
+                <option value="C">Course (C)</option>
+                <option value="D">Request D (D)</option>
+                <option value="G">Request G (G)</option>
+                <option value="ICT">In-Camp Training (ICT)</option>
+                <option value="PL">Paternity Leave (PL)</option>
+                <option value="ML">Maternity Leave (ML)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" data-close>Cancel</button>
+        <button class="btn btn-primary" type="submit">Update</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="lockDayDialog">
+    <form class="modal" method="dialog" id="lockDayForm">
+      <div class="modal-head">
+        <div>
+          <h2>Lock Day</h2>
+          <div class="subtle">Locked days show the shift code and a lock label only.</div>
+        </div>
+        <button class="close" value="cancel" type="button" data-close>&times;</button>
+      </div>
+      <div class="field">
+        <label for="lockDayDate">Day to lock or unlock</label>
+        <input id="lockDayDate" type="date" required>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" id="unlockDayAction">Unlock Day</button>
+        <button class="btn btn-primary" type="submit">Update</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="lockMonthDialog">
+    <form class="modal" method="dialog" id="lockMonthForm">
+      <div class="modal-head">
+        <div>
+          <h2>Lock Leave Application</h2>
+          <div class="subtle">This locks leave application for the selected month only.</div>
+        </div>
+        <button class="close" value="cancel" type="button" data-close>&times;</button>
+      </div>
+      <div class="field">
+        <label for="lockMonthDate">Desired day in the month to lock</label>
+        <input id="lockMonthDate" type="date" required>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" id="unlockMonthAction">Unlock Month</button>
+        <button class="btn btn-primary" type="submit">Lock Month</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="limitDialog">
+    <form class="modal" method="dialog" id="limitForm">
+      <div class="modal-head">
+        <div>
+          <h2>Limit Leave</h2>
+          <div class="subtle">Request D and Request G are not counted in the leave limit.</div>
+        </div>
+        <button class="close" value="cancel" type="button" data-close>&times;</button>
+      </div>
+      <div class="field">
+        <label for="leaveLimit">Number of leave allowed per day</label>
+        <input id="leaveLimit" type="number" min="0" step="1" required>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" data-close>Cancel</button>
+        <button class="btn btn-primary" type="submit">Update</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="patternDialog">
+    <form class="modal" method="dialog" id="patternForm">
+      <div class="modal-head">
+        <div>
+          <h2>Generate Roster Pattern</h2>
+          <div class="subtle">Pattern repeats as D, G, O, O, D, G, O, O, D, G, O, S.</div>
+        </div>
+        <button class="close" value="cancel" type="button" data-close>&times;</button>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="patternStaff">Staff name</label>
+          <select id="patternStaff"></select>
+        </div>
+        <div class="field">
+          <label for="patternScope">Generate for</label>
+          <select id="patternScope">
+            <option value="month">Current month</option>
+            <option value="year">Till end of the year</option>
+          </select>
+        </div>
+        <div class="field full">
+          <label>Set one reference day as S</label>
+          <div class="roster-days" id="rosterDays"></div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" data-close>Cancel</button>
+        <button class="btn btn-primary" type="submit">Generate</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="staffDialog">
+    <form class="modal" method="dialog" id="staffForm">
+      <div class="modal-head">
+        <div>
+          <h2>Add Staff</h2>
+          <div class="subtle">Add staff login details and roster attributes.</div>
+        </div>
+        <button class="close" value="cancel" type="button" data-close>&times;</button>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="staffName">Name</label>
+          <input id="staffName" required>
+        </div>
+        <div class="field">
+          <label for="staffGroup">Shift group</label>
+          <select id="staffGroup">
+            <option>A</option><option>B</option><option>C</option><option>D</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="staffRole">Role</label>
+          <select id="staffRole">
+            <option>YDM</option>
+            <option>YEXEC</option>
+            <option>YDM/YEXEC</option>
+          </select>
+        </div>
+        <label class="checkline">
+          <input type="checkbox" id="staffOjt"> OJT
+        </label>
+        <div class="field">
+          <label for="staffUsername">Username</label>
+          <input id="staffUsername" autocomplete="off" required>
+        </div>
+        <div class="field">
+          <label for="staffPassword">Password</label>
+          <input id="staffPassword" type="password" autocomplete="new-password" required>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" data-close>Cancel</button>
+        <button class="btn btn-primary" type="submit">Add Staff</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const storeKey = "staff-leave-roster-calendar-v2";
+    const shiftCodes = ["D", "G", "O", "S", "N"];
+    const leaveCodes = [
+      ["", "No Leave"],
+      ["VL", "Vacation Leave (VL)"],
+      ["C", "Course (C)"],
+      ["U", "Maintain Off (U)"],
+      ["EPH", "Public Holiday (EPH)"],
+      ["D", "Request D (D)"],
+      ["G", "Request G (G)"],
+      ["ICT", "In-Camp Training (ICT)"],
+      ["PL", "Paternity Leave (PL)"],
+      ["ML", "Maternity Leave (ML)"]
+    ];
+    const countedLeaveCodes = new Set(["VL", "C", "U", "EPH", "ICT", "PL", "ML"]);
+    const pattern = ["D", "G", "O", "O", "D", "G", "O", "O", "D", "G", "O", "S"];
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const holidays = {
+      "2026-01-01": "New Year's Day",
+      "2026-02-17": "Chinese New Year",
+      "2026-02-18": "Chinese New Year",
+      "2026-03-21": "Hari Raya Puasa",
+      "2026-04-03": "Good Friday",
+      "2026-05-01": "Labour Day",
+      "2026-05-27": "Hari Raya Haji",
+      "2026-05-31": "Vesak Day",
+      "2026-06-01": "Vesak Day in lieu",
+      "2026-08-09": "National Day",
+      "2026-08-10": "National Day in lieu",
+      "2026-11-08": "Deepavali",
+      "2026-11-09": "Deepavali in lieu",
+      "2026-12-25": "Christmas Day",
+      "2027-01-01": "New Year's Day",
+      "2027-02-06": "Chinese New Year",
+      "2027-02-07": "Chinese New Year",
+      "2027-02-08": "Chinese New Year in lieu",
+      "2027-03-10": "Hari Raya Puasa",
+      "2027-03-26": "Good Friday",
+      "2027-05-01": "Labour Day",
+      "2027-05-17": "Hari Raya Haji",
+      "2027-05-20": "Vesak Day",
+      "2027-08-09": "National Day",
+      "2027-10-28": "Deepavali",
+      "2027-12-25": "Christmas Day"
+    };
+
+    const today = new Date();
+    let state = loadState();
+    let visibleMonth = today.getMonth();
+    let visibleYear = today.getFullYear();
+    let currentUserId = null;
+    let adminMode = false;
+    let pendingChanges = {};
+    let activeCell = null;
+    let selectedPatternDate = null;
+    let dragStaffId = null;
+    let serverVersion = 0;
+    let lastServerUpdatedBy = "";
+    const clientId = localStorage.getItem(`${storeKey}-client-id`) || crypto.randomUUID();
+    localStorage.setItem(`${storeKey}-client-id`, clientId);
+
+    const els = {
+      calendar: document.getElementById("calendar"),
+      monthSelect: document.getElementById("monthSelect"),
+      yearSelect: document.getElementById("yearSelect"),
+      modePill: document.getElementById("modePill"),
+      userPill: document.getElementById("userPill"),
+      externalChangeNotice: document.getElementById("externalChangeNotice"),
+      monthLockNotice: document.getElementById("monthLockNotice"),
+      loginBtn: document.getElementById("loginBtn"),
+      logoutBtn: document.getElementById("logoutBtn"),
+      confirmBtn: document.getElementById("confirmBtn"),
+      changePasswordBtn: document.getElementById("changePasswordBtn"),
+      adminModeBtn: document.getElementById("adminModeBtn"),
+      adminActions: document.getElementById("adminActions"),
+      exitAdminBtn: document.getElementById("exitAdminBtn"),
+      leaveLimitLabel: document.getElementById("leaveLimitLabel"),
+      toast: document.getElementById("toast"),
+      loginDialog: document.getElementById("loginDialog"),
+      loginForm: document.getElementById("loginForm"),
+      adminLoginDialog: document.getElementById("adminLoginDialog"),
+      adminLoginForm: document.getElementById("adminLoginForm"),
+      passwordDialog: document.getElementById("passwordDialog"),
+      passwordForm: document.getElementById("passwordForm"),
+      passwordSubmit: document.getElementById("passwordSubmit"),
+      cellDialog: document.getElementById("cellDialog"),
+      cellForm: document.getElementById("cellForm"),
+      cellTitle: document.getElementById("cellTitle"),
+      cellSubtitle: document.getElementById("cellSubtitle"),
+      shiftField: document.getElementById("shiftField"),
+      cellShift: document.getElementById("cellShift"),
+      cellLeave: document.getElementById("cellLeave"),
+      specialLeave: document.getElementById("specialLeave"),
+      leaveTiles: document.getElementById("leaveTiles"),
+      lockDayDialog: document.getElementById("lockDayDialog"),
+      lockDayForm: document.getElementById("lockDayForm"),
+      lockDayDate: document.getElementById("lockDayDate"),
+      unlockDayAction: document.getElementById("unlockDayAction"),
+      lockMonthDialog: document.getElementById("lockMonthDialog"),
+      lockMonthForm: document.getElementById("lockMonthForm"),
+      lockMonthDate: document.getElementById("lockMonthDate"),
+      unlockMonthAction: document.getElementById("unlockMonthAction"),
+      limitDialog: document.getElementById("limitDialog"),
+      limitForm: document.getElementById("limitForm"),
+      leaveLimit: document.getElementById("leaveLimit"),
+      patternDialog: document.getElementById("patternDialog"),
+      patternForm: document.getElementById("patternForm"),
+      patternStaff: document.getElementById("patternStaff"),
+      patternScope: document.getElementById("patternScope"),
+      rosterDays: document.getElementById("rosterDays"),
+      staffDialog: document.getElementById("staffDialog"),
+      staffForm: document.getElementById("staffForm")
+    };
+
+    initialise();
+
+    async function initialise() {
+      monthNames.forEach((name, index) => els.monthSelect.add(new Option(name, index)));
+      const startYear = Math.min(2026, today.getFullYear());
+      for (let year = startYear; year <= startYear + 5; year += 1) {
+        els.yearSelect.add(new Option(year, year));
+      }
+      els.monthSelect.value = visibleMonth;
+      els.yearSelect.value = visibleYear;
+
+      bindEvents();
+      await loadSharedState();
+      ensureMonthDefaults(visibleYear, visibleMonth);
+      startSharedPolling();
+      render();
+    }
+
+    function bindEvents() {
+      els.monthSelect.addEventListener("change", () => {
+        visibleMonth = Number(els.monthSelect.value);
+        ensureMonthDefaults(visibleYear, visibleMonth);
+        render();
+      });
+      els.yearSelect.addEventListener("change", () => {
+        visibleYear = Number(els.yearSelect.value);
+        ensureMonthDefaults(visibleYear, visibleMonth);
+        render();
+      });
+
+      els.loginBtn.addEventListener("click", () => {
+        els.loginForm.reset();
+        els.loginDialog.showModal();
+      });
+      els.logoutBtn.addEventListener("click", () => {
+        currentUserId = null;
+        pendingChanges = {};
+        render();
+        showToast("Logged out.");
+      });
+      els.adminModeBtn.addEventListener("click", () => {
+        els.adminLoginForm.reset();
+        els.adminLoginDialog.showModal();
+      });
+      els.exitAdminBtn.addEventListener("click", () => {
+        adminMode = false;
+        pendingChanges = {};
+        render();
+      });
+      els.confirmBtn.addEventListener("click", confirmSubmission);
+      els.changePasswordBtn.addEventListener("click", openPasswordDialog);
+      document.getElementById("lockDayBtn").addEventListener("click", () => {
+        els.lockDayDate.value = dateKey(visibleYear, visibleMonth, 1);
+        els.lockDayDialog.showModal();
+      });
+      document.getElementById("lockMonthBtn").addEventListener("click", () => {
+        els.lockMonthDate.value = dateKey(visibleYear, visibleMonth, 1);
+        els.lockMonthDialog.showModal();
+      });
+      document.getElementById("limitLeaveBtn").addEventListener("click", () => {
+        els.leaveLimit.value = state.leaveLimit;
+        els.limitDialog.showModal();
+      });
+      document.getElementById("patternBtn").addEventListener("click", openPatternDialog);
+      document.getElementById("addStaffBtn").addEventListener("click", () => {
+        els.staffForm.reset();
+        els.staffDialog.showModal();
+      });
+      document.getElementById("exportBtn").addEventListener("click", exportExcel);
+
+      els.loginForm.addEventListener("submit", handleLogin);
+      els.adminLoginForm.addEventListener("submit", handleAdminLogin);
+      els.passwordForm.addEventListener("submit", handlePasswordChange);
+      ["oldPassword", "newPassword", "retypePassword"].forEach((id) => {
+        document.getElementById(id).addEventListener("input", validatePasswordForm);
+      });
+      els.cellForm.addEventListener("submit", saveCell);
+      els.leaveTiles.querySelectorAll(".leave-tile").forEach((button) => {
+        button.addEventListener("click", () => setLeaveCode(button.dataset.leave || ""));
+      });
+      els.specialLeave.addEventListener("change", () => setLeaveCode(els.specialLeave.value));
+      els.lockDayForm.addEventListener("submit", lockDay);
+      els.unlockDayAction.addEventListener("click", unlockDay);
+      els.lockMonthForm.addEventListener("submit", lockMonth);
+      els.unlockMonthAction.addEventListener("click", unlockMonth);
+      els.limitForm.addEventListener("submit", updateLimit);
+      els.patternStaff.addEventListener("change", renderRosterDays);
+      els.patternForm.addEventListener("submit", generatePattern);
+      els.staffForm.addEventListener("submit", addStaff);
+
+      document.querySelectorAll("[data-close]").forEach((button) => {
+        button.addEventListener("click", () => button.closest("dialog").close());
+      });
+    }
+
+    function defaultState() {
+      return {
+        adminPassword: "asksk",
+        leaveLimit: 3,
+        staff: [
+          { id: "s1", name: "Aisha Rahman", group: "A", role: "YDM", ojt: false, username: "aisha", password: "asksk", order: 1 },
+          { id: "s2", name: "Daniel Tan", group: "B", role: "YEXEC", ojt: false, username: "daniel", password: "asksk", order: 2 },
+          { id: "s3", name: "Nur Iman", group: "C", role: "YDM/YEXEC", ojt: true, username: "iman", password: "asksk", order: 3 },
+          { id: "s4", name: "Mei Lin", group: "D", role: "YDM", ojt: false, username: "meilin", password: "asksk", order: 4 }
+        ],
+        cells: {},
+        dayLocks: {},
+        monthLocks: {}
+      };
+    }
+
+    function loadState() {
+      const saved = localStorage.getItem(storeKey);
+      if (saved) {
+        try { return JSON.parse(saved); } catch {}
+      }
+      return defaultState();
+    }
+
+    async function persist(options = {}) {
+      localStorage.setItem(storeKey, JSON.stringify(state));
+      if (!canUseSharedServer()) return;
+      try {
+        const response = await fetch("/api/state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            state,
+            updatedBy: clientId,
+            message: options.message || "Calendar updated"
+          })
+        });
+        if (!response.ok) throw new Error("Unable to save shared state");
+        const payload = await response.json();
+        serverVersion = payload.version || serverVersion;
+        lastServerUpdatedBy = payload.updatedBy || clientId;
+      } catch {
+        showToast("Saved on this browser only. Shared server is not available.");
+      }
+    }
+
+    function canUseSharedServer() {
+      return location.protocol === "http:" || location.protocol === "https:";
+    }
+
+    async function loadSharedState(options = {}) {
+      if (!canUseSharedServer()) return false;
+      try {
+        const response = await fetch("/api/state");
+        if (!response.ok) throw new Error("Shared state unavailable");
+        const payload = await response.json();
+        if (payload.state) {
+          const hasExternalChange = payload.version > serverVersion && payload.updatedBy && payload.updatedBy !== clientId;
+          state = payload.state;
+          serverVersion = payload.version || serverVersion;
+          lastServerUpdatedBy = payload.updatedBy || "";
+          localStorage.setItem(storeKey, JSON.stringify(state));
+          if (hasExternalChange && !options.silent) {
+            els.externalChangeNotice.hidden = false;
+            showToast("User had made leave changes.");
+          }
+          render();
+          return true;
+        }
+      } catch {
+        if (!options.silent) showToast("Shared server is not available. Using this browser only.");
+      }
+      return false;
+    }
+
+    function startSharedPolling() {
+      if (!canUseSharedServer()) return;
+      setInterval(() => {
+        loadSharedState({ silent: Object.keys(pendingChanges).length > 0 });
+      }, 8000);
+    }
+
+    function render() {
+      renderTopbar();
+      renderCalendar();
+    }
+
+    function renderTopbar() {
+      const user = getCurrentUser();
+      els.modePill.textContent = adminMode ? "Admin mode" : "Normal user mode";
+      els.modePill.classList.toggle("admin", adminMode);
+      els.userPill.textContent = user ? `Logged in: ${user.name}` : "Not logged in";
+      els.loginBtn.hidden = Boolean(user) || adminMode;
+      els.logoutBtn.hidden = !user || adminMode;
+      els.adminModeBtn.hidden = adminMode;
+      els.adminActions.hidden = !adminMode;
+      els.changePasswordBtn.disabled = !adminMode && !user;
+      els.confirmBtn.disabled = Object.keys(pendingChanges).length === 0;
+      els.confirmBtn.classList.toggle("btn-primary", Object.keys(pendingChanges).length > 0);
+      els.monthLockNotice.hidden = adminMode || !isMonthLeaveLocked(visibleYear, visibleMonth);
+      els.leaveLimitLabel.textContent = state.leaveLimit;
+    }
+
+    function renderCalendar() {
+      const days = daysInMonth(visibleYear, visibleMonth);
+      els.calendar.style.setProperty("--days", days);
+      els.calendar.innerHTML = "";
+
+      const corner = document.createElement("div");
+      corner.className = "corner";
+      corner.innerHTML = `<span>Staff</span><span class="subtle">Group · Role · OJT</span>`;
+      els.calendar.appendChild(corner);
+
+      for (let day = 1; day <= days; day += 1) {
+        const date = new Date(visibleYear, visibleMonth, day);
+        const key = dateKey(visibleYear, visibleMonth, day);
+        const head = document.createElement("div");
+        head.className = "day-head";
+        if ([0, 6].includes(date.getDay())) head.classList.add("weekend");
+        if (holidays[key]) head.classList.add("holiday");
+        if (isDayHeaderLocked(key)) head.classList.add("locked");
+        head.innerHTML = `
+          <div class="day-name">${date.toLocaleDateString(undefined, { weekday: "short" })}</div>
+          <div class="day-num">${day}</div>
+          <div class="holiday-name">${holidays[key] || ""}</div>
+          ${isDayHeaderLocked(key) ? '<div class="day-lock">Lock</div>' : ""}
+        `;
+        els.calendar.appendChild(head);
+      }
+
+      sortedStaff().forEach((staff) => {
+        els.calendar.appendChild(staffCell(staff));
+        for (let day = 1; day <= days; day += 1) {
+          els.calendar.appendChild(dayCell(staff, day));
+        }
+      });
+    }
+
+    function staffCell(staff) {
+      const item = document.createElement("div");
+      item.className = "staff";
+      const handle = document.createElement("div");
+      handle.className = `drag-handle ${adminMode ? "" : "disabled"}`;
+      handle.textContent = "↕";
+      if (adminMode) {
+        handle.draggable = true;
+        handle.addEventListener("dragstart", () => { dragStaffId = staff.id; });
+        item.addEventListener("dragover", (event) => event.preventDefault());
+        item.addEventListener("drop", () => reorderStaff(dragStaffId, staff.id));
+      }
+      const main = document.createElement("div");
+      main.className = "staff-main";
+      main.innerHTML = `
+        <div class="staff-name">${escapeHtml(staff.name)}</div>
+        <div class="staff-meta">
+          <span class="tag">${escapeHtml(staff.group)}</span>
+          <span class="tag">${escapeHtml(staff.role)}</span>
+          ${staff.ojt ? '<span class="tag ojt">OJT</span>' : ""}
+        </div>
+      `;
+      item.append(handle, main);
+      return item;
+    }
+
+    function dayCell(staff, day) {
+      const key = dateKey(visibleYear, visibleMonth, day);
+      const id = cellKey(staff.id, key);
+      const cellData = pendingChanges[id] || state.cells[id] || defaultCell(staff.id, key);
+      const date = new Date(visibleYear, visibleMonth, day);
+      const locked = isLockedForStaff(staff, key);
+      const visibleLock = isVisibleLockForStaff(staff, key);
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "cell";
+      if ([0, 6].includes(date.getDay())) item.classList.add("weekend");
+      if (holidays[key]) item.classList.add("holiday");
+      if (visibleLock) item.classList.add("locked");
+      if (pendingChanges[id]) item.classList.add("dirty");
+      if (canEditCell(staff, key)) item.classList.add("editable");
+      item.disabled = !canEditCell(staff, key);
+      item.addEventListener("click", () => openCellDialog(staff, key));
+      item.innerHTML = `
+        <div class="shift ${cellData.shift}">${cellData.shift}</div>
+        ${visibleLock ? '<div class="lock-text">Lock</div>' : `<div class="leave ${cellData.leave ? "" : "empty"}">${cellData.leave || "-"}</div>`}
+      `;
+      return item;
+    }
+
+    function canEditCell(staff, date) {
+      if (adminMode) return true;
+      if (!currentUserId || currentUserId !== staff.id) return false;
+      if (staff.ojt) return true;
+      return !isLockedForStaff(staff, date);
+    }
+
+    function isLockedForStaff(staff, date) {
+      if (adminMode || staff.ojt) return false;
+      if (state.dayLocks[date]) return true;
+      if (isMonthLeaveLocked(...parseDateParts(date))) return true;
+      return isLimitLocked(staff.id, date);
+    }
+
+    function isVisibleLockForStaff(staff, date) {
+      if (staff.ojt) return false;
+      if (adminMode) return false;
+      if (state.dayLocks[date]) return true;
+      if (isMonthLeaveLocked(...parseDateParts(date))) return true;
+      if (!adminMode && isLimitLocked(staff.id, date)) return true;
+      return false;
+    }
+
+    function isDayHeaderLocked(date) {
+      if (!adminMode) return false;
+      return Boolean(state.dayLocks[date] || isMonthLeaveLocked(...parseDateParts(date)));
+    }
+
+    function isLimitLocked(staffId, date) {
+      const limit = Number(state.leaveLimit);
+      if (limit <= 0) return false;
+      const count = sortedStaff().filter((staff) => {
+        const data = pendingChanges[cellKey(staff.id, date)] || state.cells[cellKey(staff.id, date)];
+        return data && countedLeaveCodes.has(data.leave);
+      }).length;
+      const own = pendingChanges[cellKey(staffId, date)] || state.cells[cellKey(staffId, date)];
+      return count >= limit && !(own && countedLeaveCodes.has(own.leave));
+    }
+
+    function openCellDialog(staff, date) {
+      activeCell = { staffId: staff.id, date };
+      const data = pendingChanges[cellKey(staff.id, date)] || state.cells[cellKey(staff.id, date)] || defaultCell(staff.id, date);
+      els.cellTitle.textContent = staff.name;
+      els.cellSubtitle.textContent = new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+      els.cellShift.value = data.shift;
+      setLeaveCode(data.leave || "");
+      els.shiftField.hidden = !adminMode;
+      els.cellDialog.showModal();
+    }
+
+    function setLeaveCode(code) {
+      const tileCodes = new Set(["", "VL", "U", "EPH"]);
+      els.cellLeave.value = code;
+      els.leaveTiles.querySelectorAll(".leave-tile").forEach((button) => {
+        button.classList.toggle("active", (button.dataset.leave || "") === code);
+      });
+      els.specialLeave.value = tileCodes.has(code) ? "" : code;
+    }
+
+    async function saveCell(event) {
+      event.preventDefault();
+      if (!activeCell) return;
+      const staff = state.staff.find((item) => item.id === activeCell.staffId);
+      const current = state.cells[cellKey(staff.id, activeCell.date)] || defaultCell(staff.id, activeCell.date);
+      const next = {
+        shift: adminMode ? els.cellShift.value : current.shift,
+        leave: els.cellLeave.value
+      };
+      if (!adminMode && countedLeaveCodes.has(next.leave) && isLimitLocked(staff.id, activeCell.date)) {
+        showToast("Leave limit has been reached for this day.");
+        return;
+      }
+      if (adminMode) {
+        state.cells[cellKey(staff.id, activeCell.date)] = next;
+        await persist({ message: "Admin had made roster changes" });
+      } else {
+        pendingChanges[cellKey(staff.id, activeCell.date)] = next;
+      }
+      els.cellDialog.close();
+      render();
+      showToast(adminMode ? "Admin change saved." : "Change added. Press Confirm Submission to save.");
+    }
+
+    async function confirmSubmission() {
+      if (Object.keys(pendingChanges).length === 0) return;
+
+      if (canUseSharedServer()) {
+        try {
+          const response = await fetch("/api/confirm", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              changes: pendingChanges,
+              userId: currentUserId,
+              updatedBy: clientId
+            })
+          });
+          if (!response.ok) throw new Error("Unable to confirm shared submission");
+          const payload = await response.json();
+          state = payload.state;
+          serverVersion = payload.version || serverVersion;
+          lastServerUpdatedBy = payload.updatedBy || clientId;
+          localStorage.setItem(storeKey, JSON.stringify(state));
+          showSubmissionResult(payload.applied || [], payload.rejected || []);
+          pendingChanges = {};
+          render();
+          return;
+        } catch {
+          showToast("Shared server is not available. Submission was not saved.");
+          return;
+        }
+      }
+
+      const result = applyPendingChanges(state, pendingChanges);
+      state = result.state;
+      pendingChanges = {};
+      await persist({ message: "User had made leave changes" });
+      render();
+      showSubmissionResult(result.applied, result.rejected);
+    }
+
+    function applyPendingChanges(baseState, changes) {
+      const nextState = JSON.parse(JSON.stringify(baseState));
+      const applied = [];
+      const rejected = [];
+      Object.entries(changes).forEach(([key, change]) => {
+        const [, date] = key.split("|");
+        const current = nextState.cells[key] || {};
+        const wasCounted = countedLeaveCodes.has(current.leave);
+        const willCount = countedLeaveCodes.has(change.leave);
+        const count = Object.entries(nextState.cells).filter(([cellId, cell]) => {
+          return cellId.endsWith(`|${date}`) && countedLeaveCodes.has(cell.leave);
+        }).length;
+        if (willCount && !wasCounted && count >= Number(nextState.leaveLimit)) {
+          rejected.push({ key, date, leave: change.leave, reason: "Leave limit exceeded" });
+          return;
+        }
+        nextState.cells[key] = change;
+        applied.push({ key, date, leave: change.leave || "No Leave" });
+      });
+      return { state: nextState, applied, rejected };
+    }
+
+    function showSubmissionResult(applied, rejected) {
+      const appliedLines = applied.map((item) => `${formatDateKey(item.date)}: ${item.leave}`).join("\n") || "None";
+      const rejectedLines = rejected.map((item) => `${formatDateKey(item.date)}: ${item.leave} - ${item.reason}`).join("\n") || "None";
+      alert(`Submission Result\n\nSuccessful:\n${appliedLines}\n\nNot Successful:\n${rejectedLines}`);
+      showToast(rejected.length ? "Some leave changes were not saved." : "Submission saved.");
+    }
+
+    function handleLogin(event) {
+      event.preventDefault();
+      const username = document.getElementById("loginUsername").value.trim();
+      const password = document.getElementById("loginPassword").value;
+      const staff = state.staff.find((item) => item.username === username && item.password === password);
+      if (!staff) {
+        showToast("Username or password is incorrect.");
+        return;
+      }
+      currentUserId = staff.id;
+      adminMode = false;
+      pendingChanges = {};
+      els.loginDialog.close();
+      render();
+      showToast(`Logged in as ${staff.name}.`);
+    }
+
+    function handleAdminLogin(event) {
+      event.preventDefault();
+      if (document.getElementById("adminPassword").value !== state.adminPassword) {
+        showToast("Admin password is incorrect.");
+        return;
+      }
+      adminMode = true;
+      currentUserId = null;
+      pendingChanges = {};
+      els.adminLoginDialog.close();
+      render();
+      showToast("Admin mode enabled.");
+    }
+
+    function openPasswordDialog() {
+      if (!adminMode && !getCurrentUser()) {
+        showToast("Please login before changing password.");
+        return;
+      }
+      els.passwordForm.reset();
+      els.passwordSubmit.disabled = true;
+      els.passwordDialog.showModal();
+    }
+
+    function validatePasswordForm() {
+      const oldPassword = document.getElementById("oldPassword").value;
+      const newPassword = document.getElementById("newPassword").value;
+      const retypePassword = document.getElementById("retypePassword").value;
+      const expected = adminMode ? state.adminPassword : getCurrentUser()?.password;
+      els.passwordSubmit.disabled = !(expected && oldPassword === expected && newPassword && newPassword === retypePassword);
+    }
+
+    async function handlePasswordChange(event) {
+      event.preventDefault();
+      const newPassword = document.getElementById("newPassword").value;
+      if (adminMode) {
+        state.adminPassword = newPassword;
+      } else {
+        const user = getCurrentUser();
+        if (!user) {
+          showToast("Please login before changing password.");
+          return;
+        }
+        user.password = newPassword;
+      }
+      await persist({ message: "Password updated" });
+      els.passwordDialog.close();
+      showToast("Password updated.");
+    }
+
+    async function lockDay(event) {
+      event.preventDefault();
+      state.dayLocks[els.lockDayDate.value] = true;
+      await persist({ message: "Day lock updated" });
+      els.lockDayDialog.close();
+      render();
+      showToast("Day locked.");
+    }
+
+    async function unlockDay() {
+      delete state.dayLocks[els.lockDayDate.value];
+      await persist({ message: "Day lock updated" });
+      els.lockDayDialog.close();
+      render();
+      showToast("Day unlocked.");
+    }
+
+    async function lockMonth(event) {
+      event.preventDefault();
+      const [year, month] = parseDateParts(els.lockMonthDate.value);
+      state.monthLocks[monthKey(year, month)] = Number(els.lockMonthDate.value.slice(-2));
+      await persist({ message: "Leave application lock updated" });
+      els.lockMonthDialog.close();
+      render();
+      showToast("Leave applications locked for the selected month.");
+    }
+
+    async function unlockMonth() {
+      const [year, month] = parseDateParts(els.lockMonthDate.value);
+      delete state.monthLocks[monthKey(year, month)];
+      await persist({ message: "Leave application lock updated" });
+      els.lockMonthDialog.close();
+      render();
+      showToast("Leave applications unlocked for the selected month.");
+    }
+
+    async function updateLimit(event) {
+      event.preventDefault();
+      state.leaveLimit = Math.max(0, Number(els.leaveLimit.value));
+      await persist({ message: "Leave limit updated" });
+      els.limitDialog.close();
+      render();
+      showToast("Leave limit updated.");
+    }
+
+    function openPatternDialog() {
+      els.patternStaff.innerHTML = "";
+      sortedStaff().forEach((staff) => els.patternStaff.add(new Option(staff.name, staff.id)));
+      selectedPatternDate = dateKey(visibleYear, visibleMonth, 1);
+      renderRosterDays();
+      els.patternDialog.showModal();
+    }
+
+    function renderRosterDays() {
+      const staffId = els.patternStaff.value || sortedStaff()[0]?.id;
+      const days = daysInMonth(visibleYear, visibleMonth);
+      els.rosterDays.innerHTML = "";
+      els.rosterDays.style.setProperty("--pattern-days", days);
+      for (let day = 1; day <= days; day += 1) {
+        const key = dateKey(visibleYear, visibleMonth, day);
+        const data = state.cells[cellKey(staffId, key)] || defaultCell(staffId, key);
+        const tile = document.createElement("div");
+        tile.className = "roster-day";
+        tile.style.outline = key === selectedPatternDate ? "2px solid var(--accent)" : "0";
+
+        const label = document.createElement("strong");
+        label.textContent = day;
+
+        const options = document.createElement("div");
+        options.className = "shift-options";
+        shiftCodes.forEach((shift) => {
+          const option = document.createElement("button");
+          option.type = "button";
+          option.className = `shift-option ${shift} ${data.shift === shift ? "active" : ""}`;
+          option.textContent = shift;
+          option.title = {
+            D: "Day",
+            G: "Night",
+            O: "Off",
+            S: "Standby",
+            N: "Non-Shift"
+          }[shift];
+          option.setAttribute("aria-label", `${option.title} (${shift}) for ${key}`);
+          option.addEventListener("click", async (event) => {
+            event.stopPropagation();
+            const current = state.cells[cellKey(staffId, key)] || defaultCell(staffId, key);
+            state.cells[cellKey(staffId, key)] = { shift, leave: current.leave || "" };
+            if (shift === "S") selectedPatternDate = key;
+            await persist({ message: "Roster day shift updated" });
+            renderRosterDays();
+            render();
+          });
+          options.appendChild(option);
+        });
+
+        tile.addEventListener("click", () => {
+          selectedPatternDate = key;
+          renderRosterDays();
+        });
+        tile.append(label, options);
+        els.rosterDays.appendChild(tile);
+      }
+    }
+
+    async function generatePattern(event) {
+      event.preventDefault();
+      const staffId = els.patternStaff.value;
+      const endMonth = els.patternScope.value === "year" ? 11 : visibleMonth;
+      const ref = new Date(`${selectedPatternDate}T00:00:00`);
+      const sIndex = pattern.indexOf("S");
+      for (let month = visibleMonth; month <= endMonth; month += 1) {
+        const days = daysInMonth(visibleYear, month);
+        for (let day = 1; day <= days; day += 1) {
+          const key = dateKey(visibleYear, month, day);
+          const current = state.cells[cellKey(staffId, key)] || defaultCell(staffId, key);
+          const currentDate = new Date(`${key}T00:00:00`);
+          const diff = Math.round((currentDate - ref) / 86400000);
+          const index = ((sIndex + diff) % pattern.length + pattern.length) % pattern.length;
+          state.cells[cellKey(staffId, key)] = { shift: pattern[index], leave: current.leave || "" };
+        }
+      }
+      await persist({ message: "Roster pattern generated" });
+      els.patternDialog.close();
+      render();
+      showToast("Roster pattern generated.");
+    }
+
+    function addStaff(event) {
+      event.preventDefault();
+      const username = document.getElementById("staffUsername").value.trim();
+      if (state.staff.some((staff) => staff.username === username)) {
+        showToast("Username already exists.");
+        return;
+      }
+      const staff = {
+        id: crypto.randomUUID(),
+        name: document.getElementById("staffName").value.trim(),
+        group: document.getElementById("staffGroup").value,
+        role: document.getElementById("staffRole").value,
+        ojt: document.getElementById("staffOjt").checked,
+        username,
+        password: document.getElementById("staffPassword").value,
+        order: state.staff.length + 1
+      };
+      state.staff.push(staff);
+      persist();
+      els.staffDialog.close();
+      render();
+      showToast("Staff added.");
+    }
+
+    function reorderStaff(fromId, toId) {
+      if (!fromId || fromId === toId) return;
+      const list = sortedStaff();
+      const fromIndex = list.findIndex((staff) => staff.id === fromId);
+      const toIndex = list.findIndex((staff) => staff.id === toId);
+      const [moved] = list.splice(fromIndex, 1);
+      list.splice(toIndex, 0, moved);
+      list.forEach((staff, index) => { staff.order = index + 1; });
+      persist();
+      render();
+    }
+
+    function exportExcel() {
+      const days = daysInMonth(visibleYear, visibleMonth);
+      let html = "<html><head><meta charset='utf-8'></head><body><table border='1'>";
+      html += `<tr><th rowspan="2">Staff</th>`;
+      for (let day = 1; day <= days; day += 1) {
+        const key = dateKey(visibleYear, visibleMonth, day);
+        html += `<th>${day}${holidays[key] ? " - " + escapeHtml(holidays[key]) : ""}</th>`;
+      }
+      html += "</tr><tr>";
+      for (let day = 1; day <= days; day += 1) {
+        const key = dateKey(visibleYear, visibleMonth, day);
+        html += `<th>${new Date(visibleYear, visibleMonth, day).toLocaleDateString(undefined, { weekday: "short" })}</th>`;
+      }
+      html += "</tr>";
+      sortedStaff().forEach((staff) => {
+        html += `<tr><td rowspan="2">${escapeHtml(staff.name)}<br>${escapeHtml(staff.group)} · ${escapeHtml(staff.role)}${staff.ojt ? " · OJT" : ""}</td>`;
+        for (let day = 1; day <= days; day += 1) {
+          const key = dateKey(visibleYear, visibleMonth, day);
+          const data = state.cells[cellKey(staff.id, key)] || defaultCell(staff.id, key);
+          html += `<td>${data.shift}</td>`;
+        }
+        html += "</tr><tr>";
+        for (let day = 1; day <= days; day += 1) {
+          const key = dateKey(visibleYear, visibleMonth, day);
+          const data = state.cells[cellKey(staff.id, key)] || defaultCell(staff.id, key);
+          html += `<td>${data.leave || ""}</td>`;
+        }
+        html += "</tr>";
+      });
+      html += "</table></body></html>";
+      const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `leave-roster-${visibleYear}-${String(visibleMonth + 1).padStart(2, "0")}.xls`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    function ensureMonthDefaults(year, month) {
+      sortedStaff().forEach((staff) => {
+        for (let day = 1; day <= daysInMonth(year, month); day += 1) {
+          const key = dateKey(year, month, day);
+          const id = cellKey(staff.id, key);
+          if (!state.cells[id]) state.cells[id] = defaultCell(staff.id, key);
+        }
+      });
+      persist();
+    }
+
+    function defaultCell(staffId, date) {
+      const staffIndex = sortedStaff().findIndex((staff) => staff.id === staffId);
+      const dayOffset = Math.floor((new Date(`${date}T00:00:00`) - new Date(`${visibleYear}-01-01T00:00:00`)) / 86400000);
+      return { shift: pattern[(dayOffset + Math.max(staffIndex, 0) * 3) % pattern.length], leave: "" };
+    }
+
+    function sortedStaff() {
+      return [...state.staff].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+    }
+
+    function getCurrentUser() {
+      return state.staff.find((staff) => staff.id === currentUserId);
+    }
+
+    function daysInMonth(year, month) {
+      return new Date(year, month + 1, 0).getDate();
+    }
+
+    function dateKey(year, month, day) {
+      return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+
+    function monthKey(year, month) {
+      return `${year}-${String(month + 1).padStart(2, "0")}`;
+    }
+
+    function parseDateParts(date) {
+      const [year, month] = date.split("-").map(Number);
+      return [year, month - 1];
+    }
+
+    function formatDateKey(date) {
+      return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+        day: "numeric",
+        month: "short",
+        year: "numeric"
+      });
+    }
+
+    function isMonthLeaveLocked(year, month) {
+      return Boolean(state.monthLocks[monthKey(year, month)]);
+    }
+
+    function cellKey(staffId, date) {
+      return `${staffId}|${date}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[char]));
+    }
+
+    function showToast(message) {
+      els.toast.textContent = message;
+      els.toast.classList.add("show");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => els.toast.classList.remove("show"), 2300);
+    }
+
+    if ("serviceWorker" in navigator && location.protocol !== "file:") {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

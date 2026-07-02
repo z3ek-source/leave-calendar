@@ -1,0 +1,5 @@
+outputs/leave-calendar-data.json
+outputs/leave-calendar-data.json.tmp
+.DS_Store
+__pycache__/
+*.pyc
